@@ -35,7 +35,8 @@ export default function Dashboard() {
   const { user, signOut } = useAuth();
   const [savedTabs, setSavedTabs] = useState<SavedTab[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'unread' | 'read' | 'archived'>('all');
+  type TabStatusFilter = 'all' | 'unread' | 'read' | 'archived'
+  const [filter, setFilter] = useState<TabStatusFilter>('all')
   const [searchQuery, setSearchQuery] = useState('');
 
   // Add new tab form state
@@ -61,10 +62,10 @@ export default function Dashboard() {
 
       if (error) throw error;
       setSavedTabs((data || []) as SavedTab[]);
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error loading tabs",
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
         variant: "destructive"
       });
     } finally {
@@ -100,10 +101,10 @@ export default function Dashboard() {
 
       setNewTab({ title: '', url: '', tags: '', note: '' });
       loadSavedTabs();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error saving tab",
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
         variant: "destructive"
       });
     }
@@ -118,10 +119,10 @@ export default function Dashboard() {
 
       if (error) throw error;
       loadSavedTabs();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error updating tab",
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
         variant: "destructive"
       });
     }
@@ -140,10 +141,10 @@ export default function Dashboard() {
         title: "Tab deleted",
         description: "The tab has been removed."
       });
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error deleting tab",
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
         variant: "destructive"
       });
     }
@@ -356,7 +357,7 @@ export default function Dashboard() {
               <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
                 <h2 className="text-xl font-semibold">All Saved Tabs</h2>
                 <div className="flex gap-2">
-                  <Select value={filter} onValueChange={(value: any) => setFilter(value)}>
+                  <Select value={filter} onValueChange={(value: TabStatusFilter) => setFilter(value)}>
                     <SelectTrigger className="w-40">
                       <SelectValue placeholder="Filter by status" />
                     </SelectTrigger>
