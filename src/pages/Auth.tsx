@@ -18,7 +18,7 @@ export default function Auth() {
 
   // Redirect if already authenticated
   if (user) {
-    navigate('/');
+    navigate('/dashboard');
     return null;
   }
 
@@ -39,7 +39,7 @@ export default function Auth() {
         title: "Success!",
         description: "You have been signed in."
       });
-      navigate('/');
+      navigate('/dashboard');
     }
     
     setLoading(false);
