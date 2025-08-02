@@ -10,6 +10,14 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+/**
+ * Wraps a route that requires authentication.
+ * Redirects unauthenticated users to the `/auth` page while showing a
+ * loading spinner during auth initialization.
+ *
+ * @param children - Elements to render when the user is authenticated.
+ * @returns JSX element handling auth guard logic.
+ */
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   
@@ -28,6 +36,13 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/**
+ * Wraps a route accessible only to unauthenticated users.
+ * Authenticated users are redirected to the dashboard.
+ *
+ * @param children - Elements to render when no user session exists.
+ * @returns JSX element enforcing public-route behavior.
+ */
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   
@@ -46,6 +61,13 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/**
+ * Root application component configuring providers and routes.
+ * Includes React Query, Supabase auth context, tooltips and toast
+ * notifications along with browser routing.
+ *
+ * @returns Top-level application JSX tree.
+ */
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
