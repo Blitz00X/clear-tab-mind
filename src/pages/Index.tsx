@@ -3,6 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 
+/**
+ * Landing page shown at the root of the application.
+ * Serves as a placeholder until customized.
+ *
+ * @returns Basic welcome screen JSX.
+ */
 const Index = () => {
   const { user } = useAuth();
   const navigate = useNavigate();

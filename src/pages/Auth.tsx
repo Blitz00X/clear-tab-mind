@@ -9,6 +9,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 
+/**
+ * Authentication page providing sign-in and sign-up forms.
+ * Redirects authenticated users to the dashboard.
+ */
 export default function Auth() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -22,6 +26,12 @@ export default function Auth() {
     return null;
   }
 
+  /**
+   * Attempts to sign in the user via Supabase.
+   * On success, navigates to the dashboard.
+   *
+   * @param e - Form submission event.
+   */
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -45,6 +55,11 @@ export default function Auth() {
     setLoading(false);
   };
 
+  /**
+   * Registers a new user with Supabase and prompts email confirmation.
+   *
+   * @param e - Form submission event.
+   */
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
