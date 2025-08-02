@@ -1,6 +1,12 @@
 import { useLocation } from "react-router-dom";
 import { useEffect } from "react";
 
+/**
+ * Fallback page for unmatched routes.
+ * Logs the bad path to the console for debugging.
+ *
+ * @returns 404 page JSX.
+ */
 const NotFound = () => {
   const location = useLocation();
 

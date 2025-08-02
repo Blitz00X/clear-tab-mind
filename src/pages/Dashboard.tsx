@@ -31,6 +31,11 @@ interface SavedTab {
   created_at: string;
 }
 
+/**
+ * Dashboard displaying and managing saved browser tabs.
+ * Requires an authenticated user and interacts with Supabase to
+ * fetch and mutate tab data.
+ */
 export default function Dashboard() {
   const { user, signOut } = useAuth();
   const [savedTabs, setSavedTabs] = useState<SavedTab[]>([]);
@@ -52,6 +57,10 @@ export default function Dashboard() {
     }
   }, [user]);
 
+  /**
+   * Fetches the user's saved tabs from Supabase.
+   * Updates local state and handles errors via toast notifications.
+   */
   const loadSavedTabs = async () => {
     try {
       const { data, error } = await supabase
@@ -72,6 +81,12 @@ export default function Dashboard() {
     }
   };
 
+  /**
+   * Handles submission of the "Add Tab" form.
+   * Validates and saves a new tab record to Supabase.
+   *
+   * @param e - Form submission event.
+   */
   const handleAddTab = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -109,6 +124,12 @@ export default function Dashboard() {
     }
   };
 
+  /**
+   * Updates the status of a saved tab in Supabase.
+   *
+   * @param tabId - Identifier of the tab to modify.
+   * @param status - New status (`read` or `archived`).
+   */
   const updateTabStatus = async (tabId: string, status: 'read' | 'archived') => {
     try {
       const { error } = await supabase
@@ -127,6 +148,11 @@ export default function Dashboard() {
     }
   };
 
+  /**
+   * Removes a tab permanently from Supabase.
+   *
+   * @param tabId - Identifier of the tab to delete.
+   */
   const deleteTab = async (tabId: string) => {
     try {
       const { error } = await supabase
@@ -159,6 +185,11 @@ export default function Dashboard() {
     return matchesFilter && matchesSearch;
   });
 
+  /**
+   * Calculates counts of tabs by status for display in tabs.
+   *
+   * @returns Object containing counts for all, unread, read and archived tabs.
+   */
   const getStatusCounts = () => {
     return {
       all: savedTabs.length,

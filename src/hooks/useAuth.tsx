@@ -12,7 +12,13 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
+/**
+ * Provides Supabase authentication context to descendant components.
+ * Establishes an auth state listener and exposes auth helpers.
+ *
+ * @param children - React nodes that require access to auth state.
+ * @returns JSX element wrapping children with auth context.
+ */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -38,6 +44,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
+  /**
+   * Registers a new user with Supabase and sends confirmation email.
+   *
+   * @param email - User email address.
+   * @param password - User password.
+   * @returns Object containing any Supabase error.
+   */
   const signUp = async (email: string, password: string) => {
     const redirectUrl = `${window.location.origin}/`;
     
@@ -51,6 +64,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error };
   };
 
+  /**
+   * Signs in an existing user via Supabase.
+   *
+   * @param email - User email address.
+   * @param password - User password.
+   * @returns Object containing any Supabase error.
+   */
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -59,6 +79,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error };
   };
 
+  /**
+   * Signs out the current user from Supabase.
+   */
   const signOut = async () => {
     await supabase.auth.signOut();
   };
@@ -77,6 +100,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * Hook to access the authentication context.
+ * Throws if used outside of the `AuthProvider`.
+ *
+ * @returns Current auth context including user and helper methods.
+ */
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
