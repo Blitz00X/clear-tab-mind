@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Clear Tab Mind",
+  "version": "1.0.0",
+  "description": "Save and organize your browser tabs to clear your mind",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://*/*",
+    "http://*/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Clear Tab Mind"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ]
+} 
