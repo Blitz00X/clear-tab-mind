@@ -394,29 +394,58 @@ class ClearTabMindPopup {
 
     // Add event delegation for all actions
     document.addEventListener('click', (e) => {
-      if (e.target.classList.contains('btn-open')) {
-        const url = e.target.getAttribute('data-url');
+      const target = e.target instanceof HTMLElement ? e.target : null;
+      if (!target) return;
+
+      const openBtn = target.closest('.btn-open');
+      if (openBtn) {
+        const url = openBtn.getAttribute('data-url');
         this.openTab(url);
-      } else if (e.target.classList.contains('btn-read')) {
-        const tabId = e.target.getAttribute('data-tab-id');
+        return;
+      }
+
+      const readBtn = target.closest('.btn-read');
+      if (readBtn) {
+        const tabId = readBtn.getAttribute('data-tab-id');
         this.toggleReadStatus(tabId);
-      } else if (e.target.classList.contains('btn-delete')) {
-        const tabId = e.target.getAttribute('data-tab-id');
+        return;
+      }
+
+      const deleteBtn = target.closest('.btn-delete');
+      if (deleteBtn) {
+        const tabId = deleteBtn.getAttribute('data-tab-id');
         this.handleDelete(tabId);
-      } else if (e.target.classList.contains('btn-open-collection')) {
-        const collectionId = e.target.getAttribute('data-collection-id');
+        return;
+      }
+
+      const openCollectionBtn = target.closest('.btn-open-collection');
+      if (openCollectionBtn) {
+        const collectionId = openCollectionBtn.getAttribute('data-collection-id');
         const collection = this.collections.find(c => c.id === collectionId);
         if (collection) {
           this.openCollection(collection);
         }
-      } else if (e.target.classList.contains('btn-delete-collection')) {
-        const collectionId = e.target.getAttribute('data-collection-id');
+        return;
+      }
+
+      const deleteCollectionBtn = target.closest('.btn-delete-collection');
+      if (deleteCollectionBtn) {
+        const collectionId = deleteCollectionBtn.getAttribute('data-collection-id');
         this.handleDeleteCollection(collectionId);
-      } else if (e.target.id === 'loadMoreBtn') {
+        return;
+      }
+
+      if (target.closest('#loadMoreBtn')) {
         this.loadMoreTabs();
-      } else if (e.target.id === 'backBtn') {
+        return;
+      }
+
+      if (target.closest('#backBtn')) {
         this.backToCollections();
-      } else if (e.target.id === 'createCollectionBtn') {
+        return;
+      }
+
+      if (target.closest('#createCollectionBtn')) {
         this.showCreateCollectionDialog();
       }
     });
