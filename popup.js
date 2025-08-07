@@ -171,12 +171,11 @@ class ClearTabMindPopup {
     }
   }
 
-  openCollection(collection) {
-    this.currentCollection = collection;
-    this.view = 'tabs';
-    this.loadTabsFromCollection(collection.id).then(() => {
+   async openCollection(collection) {
+      this.currentCollection = collection;
+      this.view = 'tabs';
+      await this.loadTabsFromCollection(collection.id);
       this.render();
-    });
   }
 
   backToCollections() {
