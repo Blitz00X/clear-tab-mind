@@ -70,16 +70,16 @@ export default function Dashboard() {
 
       if (error) throw error;
       setSavedTabs((data || []) as SavedTab[]);
-    } catch (error) {
-      toast({
-        title: "Error loading tabs",
-        description: error.message,
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+      } catch (error: unknown) {
+        toast({
+          title: "Error loading tabs",
+          description: error instanceof Error ? error.message : String(error),
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
 
   /**
    * Handles submission of the "Add Tab" form.
@@ -115,14 +115,14 @@ export default function Dashboard() {
 
       setNewTab({ title: '', url: '', tags: '', note: '' });
       loadSavedTabs();
-    } catch (error) {
-      toast({
-        title: "Error saving tab",
-        description: error.message,
-        variant: "destructive"
-      });
-    }
-  };
+      } catch (error: unknown) {
+        toast({
+          title: "Error saving tab",
+          description: error instanceof Error ? error.message : String(error),
+          variant: "destructive"
+        });
+      }
+    };
 
 
   /**
@@ -143,14 +143,14 @@ export default function Dashboard() {
         title: "Tab deleted",
         description: "The tab has been removed."
       });
-    } catch (error) {
-      toast({
-        title: "Error deleting tab",
-        description: error.message,
-        variant: "destructive"
-      });
-    }
-  };
+      } catch (error: unknown) {
+        toast({
+          title: "Error deleting tab",
+          description: error instanceof Error ? error.message : String(error),
+          variant: "destructive"
+        });
+      }
+    };
 
   const filteredTabs = savedTabs.filter(tab => {
     const matchesFilter = filter === 'all' || tab.status === filter;
