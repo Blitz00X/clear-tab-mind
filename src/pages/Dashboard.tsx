@@ -10,13 +10,13 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  LogOut, 
-  Plus, 
-  ExternalLink, 
-  Filter, 
+import {
+  LogOut,
+  Plus,
+  ExternalLink,
   Trash2,
-  BookOpen,
+  Check,
+  X,
   Archive
 } from 'lucide-react';
 
@@ -70,7 +70,7 @@ export default function Dashboard() {
 
       if (error) throw error;
       setSavedTabs((data || []) as SavedTab[]);
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error loading tabs",
         description: error.message,
@@ -115,7 +115,7 @@ export default function Dashboard() {
 
       setNewTab({ title: '', url: '', tags: '', note: '' });
       loadSavedTabs();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error saving tab",
         description: error.message,
@@ -124,29 +124,6 @@ export default function Dashboard() {
     }
   };
 
-  /**
-   * Updates the status of a saved tab in Supabase.
-   *
-   * @param tabId - Identifier of the tab to modify.
-   * @param status - New status (`read` or `archived`).
-   */
-  const updateTabStatus = async (tabId: string, status: 'read' | 'archived') => {
-    try {
-      const { error } = await supabase
-        .from('saved_tabs')
-        .update({ status })
-        .eq('id', tabId);
-
-      if (error) throw error;
-      loadSavedTabs();
-    } catch (error: any) {
-      toast({
-        title: "Error updating tab",
-        description: error.message,
-        variant: "destructive"
-      });
-    }
-  };
 
   /**
    * Removes a tab permanently from Supabase.
@@ -166,7 +143,7 @@ export default function Dashboard() {
         title: "Tab deleted",
         description: "The tab has been removed."
       });
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error deleting tab",
         description: error.message,
@@ -320,62 +297,68 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="grid gap-4">
+              <div className="border rounded divide-y">
                 {filteredTabs.filter(tab => tab.status === 'unread').map((tab) => (
-                  <Card key={tab.id} className="hover:shadow-md transition-shadow">
-                    <CardContent className="p-6">
-                      <div className="flex justify-between items-start gap-4">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-lg mb-2 truncate">{tab.title}</h3>
-                          <p className="text-sm text-muted-foreground mb-2">{tab.domain}</p>
-                          {tab.note && (
-                            <p className="text-sm mb-3 p-2 bg-muted rounded">{tab.note}</p>
-                          )}
-                          <div className="flex flex-wrap gap-2 mb-3">
-                            {tab.tags.map((tag) => (
-                              <Badge key={tag} variant="secondary">{tag}</Badge>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="flex flex-col gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() => window.open(tab.url, '_blank')}
+                  <div
+                    key={tab.id}
+                    className="flex items-center justify-between p-2 text-xs hover:bg-muted"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <img
+                        src={`https://www.google.com/s2/favicons?domain=${tab.domain}`}
+                        alt=""
+                        className="w-4 h-4"
+                      />
+                      <span className="truncate max-w-[160px]">{tab.title}</span>
+                      <span className="text-muted-foreground truncate max-w-[120px]">
+                        {tab.domain}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        {tab.tags.slice(0, 3).map((tag) => (
+                          <Badge
+                            key={tag}
+                            variant="secondary"
+                            className="px-1 py-0 text-[10px]"
                           >
-                            <ExternalLink className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => updateTabStatus(tab.id, 'read')}
-                          >
-                            <BookOpen className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => updateTabStatus(tab.id, 'archived')}
-                          >
-                            <Archive className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => deleteTab(tab.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                            {tag}
+                          </Badge>
+                        ))}
+                        {tab.tags.length > 3 && (
+                          <span className="text-[10px] text-muted-foreground">
+                            +{tab.tags.length - 3}
+                          </span>
+                        )}
                       </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {tab.status === 'read' ? (
+                        <Check className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <X className="h-4 w-4 text-red-500" />
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => window.open(tab.url, '_blank')}
+                        className="h-6 w-6"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => deleteTab(tab.id)}
+                        className="h-6 w-6 text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
                 ))}
                 {filteredTabs.filter(tab => tab.status === 'unread').length === 0 && (
-                  <Card>
-                    <CardContent className="p-8 text-center">
-                      <p className="text-muted-foreground">No unread tabs in your queue!</p>
-                    </CardContent>
-                  </Card>
+                  <p className="p-4 text-center text-muted-foreground">
+                    No unread tabs in your queue!
+                  </p>
                 )}
               </div>
             </div>
@@ -387,7 +370,7 @@ export default function Dashboard() {
               <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
                 <h2 className="text-xl font-semibold">All Saved Tabs</h2>
                 <div className="flex gap-2">
-                  <Select value={filter} onValueChange={(value: any) => setFilter(value)}>
+                  <Select value={filter} onValueChange={(value: 'all' | 'unread' | 'read' | 'archived') => setFilter(value)}>
                     <SelectTrigger className="w-40">
                       <SelectValue placeholder="Filter by status" />
                     </SelectTrigger>
@@ -407,77 +390,70 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="grid gap-4">
+              <div className="border rounded divide-y">
                 {filteredTabs.map((tab) => (
-                  <Card key={tab.id} className="hover:shadow-md transition-shadow">
-                    <CardContent className="p-6">
-                      <div className="flex justify-between items-start gap-4">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-2">
-                            <h3 className="font-semibold text-lg truncate">{tab.title}</h3>
-                            <Badge variant={
-                              tab.status === 'unread' ? 'default' :
-                              tab.status === 'read' ? 'secondary' : 'outline'
-                            }>
-                              {tab.status}
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-muted-foreground mb-2">{tab.domain}</p>
-                          {tab.note && (
-                            <p className="text-sm mb-3 p-2 bg-muted rounded">{tab.note}</p>
-                          )}
-                          <div className="flex flex-wrap gap-2 mb-3">
-                            {tab.tags.map((tag) => (
-                              <Badge key={tag} variant="secondary">{tag}</Badge>
-                            ))}
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            Added {new Date(tab.created_at).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <div className="flex flex-col gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() => window.open(tab.url, '_blank')}
+                  <div
+                    key={tab.id}
+                    className="flex items-center justify-between p-2 text-xs hover:bg-muted"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <img
+                        src={`https://www.google.com/s2/favicons?domain=${tab.domain}`}
+                        alt=""
+                        className="w-4 h-4"
+                      />
+                      <span className="truncate max-w-[160px]">{tab.title}</span>
+                      <span className="text-muted-foreground truncate max-w-[120px]">
+                        {tab.domain}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        {tab.tags.slice(0, 3).map((tag) => (
+                          <Badge
+                            key={tag}
+                            variant="secondary"
+                            className="px-1 py-0 text-[10px]"
                           >
-                            <ExternalLink className="h-4 w-4" />
-                          </Button>
-                          {tab.status === 'unread' && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => updateTabStatus(tab.id, 'read')}
-                            >
-                              <BookOpen className="h-4 w-4" />
-                            </Button>
-                          )}
-                          {tab.status !== 'archived' && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => updateTabStatus(tab.id, 'archived')}
-                            >
-                              <Archive className="h-4 w-4" />
-                            </Button>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => deleteTab(tab.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                            {tag}
+                          </Badge>
+                        ))}
+                        {tab.tags.length > 3 && (
+                          <span className="text-[10px] text-muted-foreground">
+                            +{tab.tags.length - 3}
+                          </span>
+                        )}
                       </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {tab.status === 'archived' ? (
+                        <Archive className="h-4 w-4 text-muted-foreground" />
+                      ) : tab.status === 'read' ? (
+                        <Check className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <X className="h-4 w-4 text-red-500" />
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => window.open(tab.url, '_blank')}
+                        className="h-6 w-6"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => deleteTab(tab.id)}
+                        className="h-6 w-6 text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
                 ))}
                 {filteredTabs.length === 0 && (
-                  <Card>
-                    <CardContent className="p-8 text-center">
-                      <p className="text-muted-foreground">No tabs found matching your criteria.</p>
-                    </CardContent>
-                  </Card>
+                  <p className="p-4 text-center text-muted-foreground">
+                    No tabs found matching your criteria.
+                  </p>
                 )}
               </div>
             </div>
