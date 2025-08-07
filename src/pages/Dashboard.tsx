@@ -6,18 +6,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { TabList } from '@/components/TabList';
 import {
   LogOut,
-  Plus,
-  ExternalLink,
-  Trash2,
-  Check,
-  X,
-  Archive
+  Plus
 } from 'lucide-react';
 
 interface SavedTab {
@@ -297,70 +292,12 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="border rounded divide-y">
-                {filteredTabs.filter(tab => tab.status === 'unread').map((tab) => (
-                  <div
-                    key={tab.id}
-                    className="flex items-center justify-between p-2 text-xs hover:bg-muted"
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <img
-                        src={`https://www.google.com/s2/favicons?domain=${tab.domain}`}
-                        alt=""
-                        className="w-4 h-4"
-                      />
-                      <span className="truncate max-w-[160px]">{tab.title}</span>
-                      <span className="text-muted-foreground truncate max-w-[120px]">
-                        {tab.domain}
-                      </span>
-                      <div className="flex items-center gap-1">
-                        {tab.tags.slice(0, 3).map((tag) => (
-                          <Badge
-                            key={tag}
-                            variant="secondary"
-                            className="px-1 py-0 text-[10px]"
-                          >
-                            {tag}
-                          </Badge>
-                        ))}
-                        {tab.tags.length > 3 && (
-                          <span className="text-[10px] text-muted-foreground">
-                            +{tab.tags.length - 3}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {tab.status === 'read' ? (
-                        <Check className="h-4 w-4 text-green-500" />
-                      ) : (
-                        <X className="h-4 w-4 text-red-500" />
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => window.open(tab.url, '_blank')}
-                        className="h-6 w-6"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => deleteTab(tab.id)}
-                        className="h-6 w-6 text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-                {filteredTabs.filter(tab => tab.status === 'unread').length === 0 && (
-                  <p className="p-4 text-center text-muted-foreground">
-                    No unread tabs in your queue!
-                  </p>
-                )}
-              </div>
+              <TabList
+                tabs={filteredTabs.filter(tab => tab.status === 'unread')}
+                onOpen={(url) => window.open(url, '_blank')}
+                onDelete={deleteTab}
+                emptyMessage="No unread tabs in your queue!"
+              />
             </div>
           </TabsContent>
 
@@ -390,72 +327,12 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="border rounded divide-y">
-                {filteredTabs.map((tab) => (
-                  <div
-                    key={tab.id}
-                    className="flex items-center justify-between p-2 text-xs hover:bg-muted"
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <img
-                        src={`https://www.google.com/s2/favicons?domain=${tab.domain}`}
-                        alt=""
-                        className="w-4 h-4"
-                      />
-                      <span className="truncate max-w-[160px]">{tab.title}</span>
-                      <span className="text-muted-foreground truncate max-w-[120px]">
-                        {tab.domain}
-                      </span>
-                      <div className="flex items-center gap-1">
-                        {tab.tags.slice(0, 3).map((tag) => (
-                          <Badge
-                            key={tag}
-                            variant="secondary"
-                            className="px-1 py-0 text-[10px]"
-                          >
-                            {tag}
-                          </Badge>
-                        ))}
-                        {tab.tags.length > 3 && (
-                          <span className="text-[10px] text-muted-foreground">
-                            +{tab.tags.length - 3}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {tab.status === 'archived' ? (
-                        <Archive className="h-4 w-4 text-muted-foreground" />
-                      ) : tab.status === 'read' ? (
-                        <Check className="h-4 w-4 text-green-500" />
-                      ) : (
-                        <X className="h-4 w-4 text-red-500" />
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => window.open(tab.url, '_blank')}
-                        className="h-6 w-6"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => deleteTab(tab.id)}
-                        className="h-6 w-6 text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-                {filteredTabs.length === 0 && (
-                  <p className="p-4 text-center text-muted-foreground">
-                    No tabs found matching your criteria.
-                  </p>
-                )}
-              </div>
+              <TabList
+                tabs={filteredTabs}
+                onOpen={(url) => window.open(url, '_blank')}
+                onDelete={deleteTab}
+                emptyMessage="No tabs found matching your criteria."
+              />
             </div>
           </TabsContent>
         </Tabs>
