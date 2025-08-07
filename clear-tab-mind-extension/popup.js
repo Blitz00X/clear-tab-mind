@@ -19,7 +19,7 @@ class ClearTabMindPopup {
     await this.getCurrentTab();
     await this.loadCollections();
     this.render();
-    this.attachEventListeners();
+    this.setupGlobalEventListeners();
   }
 
   async getCurrentTab() {
@@ -78,81 +78,86 @@ class ClearTabMindPopup {
       collectionId: collectionId
     };
 
-    return new Promise((resolve) => {
-      chrome.runtime.sendMessage({ action: 'saveTab', ...tabData }, (response) => {
-        if (response.success) {
-          this.loadCollections(); // Reload collections
-          if (this.view === 'tabs') {
-            this.loadTabsFromCollection(this.currentCollection.id);
-          }
-        }
-        resolve(response);
-      });
+    const response = await new Promise(resolve => {
+      chrome.runtime.sendMessage({ action: 'saveTab', ...tabData }, resolve);
     });
+
+    if (response.success) {
+      await this.loadCollections();
+      if (this.view === 'tabs' && this.currentCollection) {
+        await this.loadTabsFromCollection(this.currentCollection.id, 1, this.currentFilter, this.searchQuery);
+      }
+    }
+
+    return response;
   }
 
   async createCollection(name, description = '') {
-    return new Promise((resolve) => {
-      chrome.runtime.sendMessage({ 
-        action: 'createCollection', 
+    const response = await new Promise(resolve => {
+      chrome.runtime.sendMessage({
+        action: 'createCollection',
         name: name,
         description: description
-      }, (response) => {
-        if (response.success) {
-          this.loadCollections();
-        }
-        resolve(response);
-      });
+      }, resolve);
     });
+
+    if (response.success) {
+      await this.loadCollections();
+    }
+
+    return response;
   }
 
   async deleteCollection(collectionId) {
-    return new Promise((resolve) => {
-      chrome.runtime.sendMessage({ 
-        action: 'deleteCollection', 
+    const response = await new Promise(resolve => {
+      chrome.runtime.sendMessage({
+        action: 'deleteCollection',
         collectionId: collectionId
-      }, (response) => {
-        if (response.success) {
-          this.loadCollections();
-          if (this.currentCollection && this.currentCollection.id === collectionId) {
-            this.view = 'collections';
-            this.currentCollection = null;
-          }
-        }
-        resolve(response);
-      });
+      }, resolve);
     });
+
+    if (response.success) {
+      await this.loadCollections();
+      if (this.currentCollection && this.currentCollection.id === collectionId) {
+        this.view = 'collections';
+        this.currentCollection = null;
+      }
+    }
+
+    return response;
   }
 
   async updateTabStatus(tabId, status) {
-    return new Promise((resolve) => {
-      chrome.runtime.sendMessage({ 
-        action: 'updateTabStatus', 
+    const response = await new Promise(resolve => {
+      chrome.runtime.sendMessage({
+        action: 'updateTabStatus',
         collectionId: this.currentCollection.id,
-        tabId: tabId, 
+        tabId: tabId,
         status: status
-      }, (response) => {
-        if (response.success) {
-          this.loadTabsFromCollection(this.currentCollection.id, this.currentPage, this.currentFilter, this.searchQuery);
-        }
-        resolve(response);
-      });
+      }, resolve);
     });
+
+    if (response.success && this.currentCollection) {
+      await this.loadTabsFromCollection(this.currentCollection.id, this.currentPage, this.currentFilter, this.searchQuery);
+    }
+
+    return response;
   }
 
   async deleteTabFromStorage(tabId) {
-    return new Promise((resolve) => {
-      chrome.runtime.sendMessage({ 
-        action: 'deleteTab', 
+    const response = await new Promise(resolve => {
+      chrome.runtime.sendMessage({
+        action: 'deleteTab',
         collectionId: this.currentCollection.id,
-        tabId: tabId 
-      }, (response) => {
-        if (response.success) {
-          this.loadTabsFromCollection(this.currentCollection.id, this.currentPage, this.currentFilter, this.searchQuery);
-        }
-        resolve(response);
-      });
+        tabId: tabId
+      }, resolve);
     });
+
+    if (response.success && this.currentCollection) {
+      await this.loadTabsFromCollection(this.currentCollection.id, this.currentPage, this.currentFilter, this.searchQuery);
+    }
+
+    return response;
   }
 
   async searchTabs(query) {
@@ -171,7 +176,7 @@ class ClearTabMindPopup {
     }
   }
 
-  async openCollection(collection) {
+   async openCollection(collection) {
       this.currentCollection = collection;
       this.view = 'tabs';
       await this.loadTabsFromCollection(collection.id);
@@ -186,12 +191,13 @@ class ClearTabMindPopup {
 
   render() {
     const root = document.getElementById('root');
-    
+
     if (this.view === 'collections') {
       root.innerHTML = this.renderCollectionsView();
     } else {
       root.innerHTML = this.renderTabsView();
     }
+    this.attachEventListeners();
   }
 
   renderCollectionsView() {
@@ -362,6 +368,65 @@ class ClearTabMindPopup {
     `;
   }
 
+  setupGlobalEventListeners() {
+    document.addEventListener('click', (e) => {
+      const target = e.target instanceof HTMLElement ? e.target : null;
+      if (!target) return;
+
+      const openBtn = target.closest('.btn-open');
+      if (openBtn) {
+        const url = openBtn.getAttribute('data-url');
+        this.openTab(url);
+        return;
+      }
+
+      const readBtn = target.closest('.btn-read');
+      if (readBtn) {
+        const tabId = readBtn.getAttribute('data-tab-id');
+        this.toggleReadStatus(tabId);
+        return;
+      }
+
+      const deleteBtn = target.closest('.btn-delete');
+      if (deleteBtn) {
+        const tabId = deleteBtn.getAttribute('data-tab-id');
+        this.handleDelete(tabId);
+        return;
+      }
+
+      const openCollectionBtn = target.closest('.btn-open-collection');
+      if (openCollectionBtn) {
+        const collectionId = openCollectionBtn.getAttribute('data-collection-id');
+        const collection = this.collections.find(c => c.id === collectionId);
+        if (collection) {
+          this.openCollection(collection);
+        }
+        return;
+      }
+
+      const deleteCollectionBtn = target.closest('.btn-delete-collection');
+      if (deleteCollectionBtn) {
+        const collectionId = deleteCollectionBtn.getAttribute('data-collection-id');
+        this.handleDeleteCollection(collectionId);
+        return;
+      }
+
+      if (target.closest('#loadMoreBtn')) {
+        this.loadMoreTabs();
+        return;
+      }
+
+      if (target.closest('#backBtn')) {
+        this.backToCollections();
+        return;
+      }
+
+      if (target.closest('#createCollectionBtn')) {
+        this.showCreateCollectionDialog();
+      }
+    });
+  }
+
   attachEventListeners() {
     const saveForm = document.getElementById('saveForm');
     if (saveForm) {
@@ -372,50 +437,19 @@ class ClearTabMindPopup {
         const tags = document.getElementById('tags').value;
         const note = document.getElementById('note').value;
         const collectionId = document.getElementById('collectionSelect')?.value || 'default';
-        
+
         await this.saveTab(title, url, tags, note, collectionId);
-        
-        // Clear form
+
         document.getElementById('title').value = '';
         document.getElementById('url').value = '';
         document.getElementById('tags').value = '';
         document.getElementById('note').value = '';
-        
-        // Show success message
+
         this.showMessage('Tab saved successfully!');
+        this.render();
       });
     }
 
-    // Add event delegation for all actions
-    document.addEventListener('click', (e) => {
-      if (e.target.classList.contains('btn-open')) {
-        const url = e.target.getAttribute('data-url');
-        this.openTab(url);
-      } else if (e.target.classList.contains('btn-read')) {
-        const tabId = e.target.getAttribute('data-tab-id');
-        this.toggleReadStatus(tabId);
-      } else if (e.target.classList.contains('btn-delete')) {
-        const tabId = e.target.getAttribute('data-tab-id');
-        this.handleDelete(tabId);
-      } else if (e.target.classList.contains('btn-open-collection')) {
-        const collectionId = e.target.getAttribute('data-collection-id');
-        const collection = this.collections.find(c => c.id === collectionId);
-        if (collection) {
-          this.openCollection(collection);
-        }
-      } else if (e.target.classList.contains('btn-delete-collection')) {
-        const collectionId = e.target.getAttribute('data-collection-id');
-        this.handleDeleteCollection(collectionId);
-      } else if (e.target.id === 'loadMoreBtn') {
-        this.loadMoreTabs();
-      } else if (e.target.id === 'backBtn') {
-        this.backToCollections();
-      } else if (e.target.id === 'createCollectionBtn') {
-        this.showCreateCollectionDialog();
-      }
-    });
-
-    // Add search functionality
     const searchInput = document.getElementById('searchInput');
     if (searchInput) {
       let searchTimeout;
@@ -427,12 +461,13 @@ class ClearTabMindPopup {
       });
     }
 
-    // Add filter functionality
     const filterSelect = document.getElementById('filterSelect');
     if (filterSelect) {
-      filterSelect.addEventListener('change', (e) => {
-        this.loadTabsFromCollection(this.currentCollection.id, 1, e.target.value, this.searchQuery);
-        this.render();
+      filterSelect.addEventListener('change', async (e) => {
+        if (this.currentCollection) {
+          await this.loadTabsFromCollection(this.currentCollection.id, 1, e.target.value, this.searchQuery);
+          this.render();
+        }
       });
     }
   }
@@ -442,6 +477,7 @@ class ClearTabMindPopup {
     if (currentTab) {
       const newStatus = currentTab.status === 'read' ? 'unread' : 'read';
       await this.updateTabStatus(tabId, newStatus);
+      this.render();
     }
   }
 
@@ -453,6 +489,7 @@ class ClearTabMindPopup {
     if (confirm('Are you sure you want to delete this tab?')) {
       await this.deleteTabFromStorage(tabId);
       this.showMessage('Tab deleted successfully!');
+      this.render();
     }
   }
 
@@ -460,14 +497,18 @@ class ClearTabMindPopup {
     if (confirm('Are you sure you want to delete this file? All tabs will be lost.')) {
       await this.deleteCollection(collectionId);
       this.showMessage('File deleted successfully!');
+      this.render();
     }
   }
 
-  showCreateCollectionDialog() {
+  async showCreateCollectionDialog() {
     const name = prompt('Enter file name:', '');
     if (name && name.trim()) {
-      this.createCollection(name.trim());
-      this.showMessage('File created successfully!');
+      const response = await this.createCollection(name.trim());
+      if (response.success) {
+        this.showMessage('File created successfully!');
+        this.render();
+      }
     }
   }
 
@@ -486,4 +527,4 @@ class ClearTabMindPopup {
 // Initialize popup when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
   window.popup = new ClearTabMindPopup();
-}); 
+});
