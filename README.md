@@ -6,7 +6,7 @@
 
 ## Features
 
-### 🗄️Data Architecture
+### Data Architecture
 - **IndexedDB (Dexie.js)** storage — scales to 1000+ items with indexed queries (replaces 5 MB `chrome.storage.local` limit)
 - Four item types: **Tab**, **Video** (YouTube/Vimeo), **RSS_Feed**, **Note**
 - Each item carries: title, URL, favicon, thumbnail, tags, folder, workspace, status, and rich metadata
