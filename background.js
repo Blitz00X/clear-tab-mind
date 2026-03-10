@@ -1,481 +1,213 @@
-// Background service worker for Clear Tab Mind extension
+// ============================================================
+// Clear Tab Mind – Background Service Worker (MV3)
+// Handles: context menus, side panel, tab activity, alarms,
+// RSS polling, hibernation, workspace switching messages
+// ============================================================
 
-// Listen for extension installation
-chrome.runtime.onInstalled.addListener(() => {
-  console.log('Clear Tab Mind extension installed');
-  
-  // Create context menu item
+// ─────────────────────────────────────────────
+// 1. Tab activity tracking (for hibernation)
+// ─────────────────────────────────────────────
+const tabActivity = new Map();
+
+function updateTabActivity(tabId, url, windowId, index) {
+  tabActivity.set(tabId, {
+    url,
+    lastActiveAt: Date.now(),
+    windowId,
+    index,
+  });
+}
+
+// ─────────────────────────────────────────────
+// 2. Installation / startup
+// ─────────────────────────────────────────────
+chrome.runtime.onInstalled.addListener(async () => {
+  console.log('[CTM] Extension installed');
+
   chrome.contextMenus.create({
     id: 'addToClearTabMind',
     title: 'Add to Clear Tab Mind',
-    contexts: ['link', 'page']
+    contexts: ['link', 'page'],
   });
-  
-  // Initialize file storage with default collection
-  initializeFileStorage();
+
+  // Create hibernation check alarm
+  chrome.alarms.get('ctm-hibernation-check', (alarm) => {
+    if (!alarm) chrome.alarms.create('ctm-hibernation-check', { periodInMinutes: 5 });
+  });
+
+  // Create RSS polling alarm
+  chrome.alarms.get('ctm-rss-poll', (alarm) => {
+    if (!alarm) chrome.alarms.create('ctm-rss-poll', { periodInMinutes: 60 });
+  });
 });
 
-// File storage system with collections
-let collectionsCache = new Map();
-let lastCacheUpdate = 0;
-const CACHE_DURATION = 30000; // 30 seconds
+// Seed tab activity on startup
+chrome.tabs.query({}, (tabs) => {
+  for (const tab of tabs) {
+    if (tab.id && tab.url) updateTabActivity(tab.id, tab.url, tab.windowId, tab.index);
+  }
+});
 
-// Initialize file storage
-async function initializeFileStorage() {
+// ─────────────────────────────────────────────
+// 3. Side Panel
+// ─────────────────────────────────────────────
+chrome.action.onClicked.addListener(async (tab) => {
+  if (!chrome.sidePanel?.open) {
+    console.warn('[CTM] Side panel API unavailable');
+    return;
+  }
   try {
-    // Create storage directory if it doesn't exist
-    await chrome.storage.local.set({ 
-      fileStorageInitialized: true,
-      lastFileUpdate: Date.now()
-    });
-    
-    // Load initial collections
-    await loadCollectionsFromStorage();
-    
-    // Migrate old data if needed
-    await migrateOldData();
-    
-    // Create default collection if none exists
-    if (collectionsCache.size === 0) {
-      await createDefaultCollection();
+    if (typeof tab?.id === 'number') {
+      await chrome.sidePanel.setOptions({ tabId: tab.id, path: 'sidepanel.html' });
+      await chrome.sidePanel.open({ tabId: tab.id });
+    } else if (typeof tab?.windowId === 'number') {
+      await chrome.sidePanel.open({ windowId: tab.windowId });
+    } else {
+      await chrome.sidePanel.open({});
     }
-  } catch (error) {
-    console.error('Error initializing file storage:', error);
+  } catch (err) {
+    console.error('[CTM] Side panel error:', err);
   }
-}
+});
 
-// Migrate old savedTabs data to new collections format
-async function migrateOldData() {
-  try {
-    const result = await chrome.storage.local.get(['savedTabs', 'migrationCompleted']);
-    
-    // If migration is already completed, skip
-    if (result.migrationCompleted) {
-      return;
+// ─────────────────────────────────────────────
+// 4. Tab tracking events
+// ─────────────────────────────────────────────
+chrome.tabs.onActivated.addListener(({ tabId, windowId }) => {
+  chrome.tabs.get(tabId, (tab) => {
+    if (chrome.runtime.lastError || !tab?.url) return;
+    updateTabActivity(tabId, tab.url, windowId, tab.index);
+  });
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status === 'complete' && tab.url) {
+    const existing = tabActivity.get(tabId);
+    if (existing) updateTabActivity(tabId, tab.url, tab.windowId, tab.index);
+  }
+});
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  tabActivity.delete(tabId);
+});
+
+// ─────────────────────────────────────────────
+// 5. Alarm handlers
+// ─────────────────────────────────────────────
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+  if (alarm.name === 'ctm-hibernation-check') {
+    await runHibernationCheck();
+  }
+  if (alarm.name === 'ctm-rss-poll') {
+    // Notify any open dashboard/sidepanel pages to run RSS poll
+    chrome.runtime.sendMessage({ action: 'triggerRssPoll' }).catch(() => { });
+  }
+});
+
+async function runHibernationCheck() {
+  const THRESHOLD = 30 * 60 * 1000; // 30 min
+  const now = Date.now();
+
+  for (const [tabId, record] of tabActivity.entries()) {
+    if (now - record.lastActiveAt < THRESHOLD) continue;
+
+    try {
+      const tab = await new Promise((resolve) => {
+        chrome.tabs.get(tabId, (t) => resolve(chrome.runtime.lastError ? null : t));
+      });
+      if (!tab || tab.pinned) continue;
+      if (!tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://')) continue;
+
+      // Notify UI to save the tab
+      chrome.runtime.sendMessage({
+        action: 'hibernateTab',
+        tabData: {
+          url: tab.url,
+          title: tab.title || tab.url,
+          favicon: tab.favIconUrl || '',
+          windowId: tab.windowId,
+          index: tab.index,
+          last_accessed_at: new Date(record.lastActiveAt).toISOString(),
+        },
+      }).catch(() => { });
+
+      chrome.tabs.remove(tabId);
+      tabActivity.delete(tabId);
+      console.log(`[CTM] Hibernated: ${tab.title}`);
+    } catch (err) {
+      console.error('[CTM] Hibernation error:', err);
     }
-    
-    const oldSavedTabs = result.savedTabs || [];
-    
-    if (oldSavedTabs.length > 0) {
-      console.log('Migrating old data:', oldSavedTabs.length, 'tabs');
-      
-      // Create default collection if it doesn't exist
-      let defaultCollection = collectionsCache.get('default');
-      if (!defaultCollection) {
-        defaultCollection = {
-          id: 'default',
-          name: 'LaterTab',
-          description: 'Default collection for saved tabs',
-          created_at: new Date().toISOString(),
-          tabs: []
-        };
-      }
-      
-      // Convert old tabs to new format and add to default collection
-      const migratedTabs = oldSavedTabs.map(tab => ({
-        id: tab.id || Date.now().toString(),
-        title: tab.title || 'Untitled',
-        url: tab.url || '',
-        domain: tab.domain || new URL(tab.url || 'https://example.com').hostname,
-        tags: tab.tags || [],
-        note: tab.note || '',
-        status: tab.status || 'unread',
-        created_at: tab.created_at || new Date().toISOString()
-      }));
-      
-      // Add migrated tabs to default collection
-      defaultCollection.tabs = [...migratedTabs, ...defaultCollection.tabs];
-      collectionsCache.set('default', defaultCollection);
-      
-      // Save the migrated data
-      await saveCollectionsToStorage();
-      
-      // Mark migration as completed
-      await chrome.storage.local.set({ migrationCompleted: true });
-      
-      console.log('Migration completed successfully');
-    }
-  } catch (error) {
-    console.error('Error during migration:', error);
   }
 }
 
-// Create default collection
-async function createDefaultCollection() {
-  const defaultCollection = {
-    id: 'default',
-    name: 'LaterTab',
-    description: 'Default collection for saved tabs',
-    created_at: new Date().toISOString(),
-    tabs: []
-  };
-  
-  collectionsCache.set('default', defaultCollection);
-  await saveCollectionsToStorage();
-}
-
-// Load collections from storage
-async function loadCollectionsFromStorage() {
-  try {
-    const result = await chrome.storage.local.get(['collections', 'lastFileUpdate']);
-    const collections = result.collections || [];
-    
-    // Clear cache and rebuild
-    collectionsCache.clear();
-    collections.forEach(collection => {
-      collectionsCache.set(collection.id, collection);
-    });
-    
-    lastCacheUpdate = Date.now();
-    return collections;
-  } catch (error) {
-    console.error('Error loading collections:', error);
-    return [];
-  }
-}
-
-// Save collections to storage
-async function saveCollectionsToStorage() {
-  try {
-    const collectionsArray = Array.from(collectionsCache.values());
-    await chrome.storage.local.set({ 
-      collections: collectionsArray,
-      lastFileUpdate: Date.now()
-    });
-    lastCacheUpdate = Date.now();
-  } catch (error) {
-    console.error('Error saving collections:', error);
-  }
-}
-
-// Get collections with tab counts
-async function getCollectionsWithCounts() {
-  await ensureCacheIsFresh();
-  
-  const collections = Array.from(collectionsCache.values()).map(collection => ({
-    id: collection.id,
-    name: collection.name,
-    description: collection.description,
-    created_at: collection.created_at,
-    tabCount: collection.tabs.length,
-    unreadCount: collection.tabs.filter(tab => tab.status === 'unread').length
-  }));
-  
-  // Sort by creation date (newest first)
-  collections.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  
-  return collections;
-}
-
-// Get tabs from a specific collection with pagination
-async function getTabsFromCollection(collectionId, page = 1, limit = 20, filter = 'all') {
-  await ensureCacheIsFresh();
-  
-  const collection = collectionsCache.get(collectionId);
-  if (!collection) {
-    return { tabs: [], total: 0, page: 1, totalPages: 0, hasMore: false };
-  }
-  
-  let tabs = [...collection.tabs];
-  
-  // Apply filters
-  if (filter !== 'all') {
-    tabs = tabs.filter(tab => tab.status === filter);
-  }
-  
-  // Sort by creation date (newest first)
-  tabs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  
-  // Calculate pagination
-  const startIndex = (page - 1) * limit;
-  const endIndex = startIndex + limit;
-  const paginatedTabs = tabs.slice(startIndex, endIndex);
-  
-  return {
-    tabs: paginatedTabs,
-    total: tabs.length,
-    page: page,
-    totalPages: Math.ceil(tabs.length / limit),
-    hasMore: endIndex < tabs.length,
-    collection: {
-      id: collection.id,
-      name: collection.name,
-      description: collection.description
-    }
-  };
-}
-
-// Ensure cache is fresh
-async function ensureCacheIsFresh() {
-  if (Date.now() - lastCacheUpdate > CACHE_DURATION) {
-    await loadCollectionsFromStorage();
-  }
-}
-
-// Listen for context menu clicks
+// ─────────────────────────────────────────────
+// 6. Context menu
+// ─────────────────────────────────────────────
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === 'addToClearTabMind') {
-    handleAddToClearTabMind(info, tab, '');
-  }
-});
+    const url = info.linkUrl || tab?.url;
+    if (!url) return;
+    chrome.runtime.sendMessage({
+      action: 'addItemFromContext',
+      url,
+      title: info.linkText || tab?.title || url,
+      tabId: tab?.id,
+    }).catch(() => { });
 
-// Get the proper title for the link
-async function getLinkTitle(info, tab) {
-  // If it's a link, use the link text or try to extract title from the link
-  if (info.linkUrl) {
-    // Use link text if available
-    if (info.linkText && info.linkText.trim()) {
-      return info.linkText.trim();
-    }
-    
-    // Try to extract title from the link URL
-    const url = new URL(info.linkUrl);
-    if (url.hostname.includes('youtube.com') || url.hostname.includes('youtu.be')) {
-      // For YouTube, try to get the actual video title
-      const videoTitle = await getYouTubeVideoTitle(info.linkUrl);
-      if (videoTitle) {
-        return videoTitle;
-      }
-      
-      // Fallback to video ID
-      const videoId = url.searchParams.get('v') || url.pathname.split('/').pop();
-      if (videoId && videoId !== 'watch') {
-        return `YouTube Video (${videoId})`;
-      }
-    }
-    
-    // Fallback to domain name
-    return `${url.hostname} - ${url.pathname.split('/').pop() || 'page'}`;
-  }
-  
-  // If it's the current page, use the page title
-  return tab.title;
-}
-
-// Function to get YouTube video title
-async function getYouTubeVideoTitle(url) {
-  try {
-    const urlObj = new URL(url);
-    const videoId = urlObj.searchParams.get('v') || urlObj.pathname.split('/').pop();
-    
-    if (!videoId || videoId === 'watch') {
-      return null;
-    }
-    
-    // Try to get video title from YouTube's oEmbed API
-    const oembedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`;
-    
-    const response = await fetch(oembedUrl);
-    if (response.ok) {
-      const data = await response.json();
-      return data.title;
-    }
-    
-    return null;
-  } catch (error) {
-    console.error('Error fetching YouTube video title:', error);
-    return null;
-  }
-}
-
-// Handle adding to Clear Tab Mind
-async function handleAddToClearTabMind(info, tab, note = '') {
-  const url = info.linkUrl || tab.url;
-  const title = await getLinkTitle(info, tab);
-  const domain = new URL(url).hostname;
-  
-  const tabData = {
-    id: Date.now().toString(),
-    title: title,
-    url: url,
-    domain: domain,
-    tags: [],
-    note: note,
-    status: 'unread',
-    created_at: new Date().toISOString()
-  };
-  
-  try {
-    // Add to default collection
-    const defaultCollection = collectionsCache.get('default');
-    if (defaultCollection) {
-      defaultCollection.tabs.unshift(tabData);
-      collectionsCache.set('default', defaultCollection);
-      await saveCollectionsToStorage();
-    }
-    
-    // Show notification
     chrome.notifications.create({
       type: 'basic',
       iconUrl: 'icons/icon48.png',
       title: 'Clear Tab Mind',
-      message: `"${title}" has been saved to LaterTab!`
+      message: `Saved: "${info.linkText || tab?.title || url}"`,
     });
-    
-    console.log('Tab saved via context menu:', tabData);
-  } catch (error) {
-    console.error('Error saving tab via context menu:', error);
   }
-}
+});
 
-// Listen for messages from popup and content scripts
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+// ─────────────────────────────────────────────
+// 7. Message bridge for content scripts / popup
+// ─────────────────────────────────────────────
+chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   if (request.action === 'getCurrentTab') {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      sendResponse({ tab: tabs[0] });
-    });
-    return true; // Keep message channel open for async response
-  }
-  
-  if (request.action === 'saveTab') {
-    const tabData = {
-      id: Date.now().toString(),
-      title: request.title,
-      url: request.url,
-      domain: new URL(request.url).hostname,
-      tags: request.tags || [],
-      note: request.note || '',
-      status: 'unread',
-      created_at: new Date().toISOString()
-    };
-    
-    // Add to specified collection or default
-    const collectionId = request.collectionId || 'default';
-    const collection = collectionsCache.get(collectionId);
-    if (collection) {
-      collection.tabs.unshift(tabData);
-      collectionsCache.set(collectionId, collection);
-      saveCollectionsToStorage().then(() => {
-        sendResponse({ success: true, tab: tabData });
-      });
-    } else {
-      sendResponse({ success: false, error: 'Collection not found' });
-    }
-    return true;
-  }
-  
-  if (request.action === 'getCollections') {
-    getCollectionsWithCounts().then(collections => {
-      sendResponse(collections);
+      sendResponse({ tab: tabs[0] || null });
     });
     return true;
   }
-  
-  if (request.action === 'getTabsFromCollection') {
-    getTabsFromCollection(
-      request.collectionId, 
-      request.page || 1, 
-      request.limit || 20, 
-      request.filter || 'all'
-    ).then(result => {
-      sendResponse(result);
-    });
+
+  if (request.action === 'openDashboard') {
+    chrome.tabs.create({ url: chrome.runtime.getURL('index.html') });
+    sendResponse({ ok: true });
     return true;
   }
-  
-  if (request.action === 'createCollection') {
-    const newCollection = {
-      id: Date.now().toString(),
-      name: request.name,
-      description: request.description || '',
-      created_at: new Date().toISOString(),
-      tabs: []
-    };
-    
-    collectionsCache.set(newCollection.id, newCollection);
-    saveCollectionsToStorage().then(() => {
-      sendResponse({ success: true, collection: newCollection });
-    });
+
+  if (request.action === 'openTab') {
+    chrome.tabs.create({ url: request.url, active: true });
+    sendResponse({ ok: true });
     return true;
   }
-  
-  if (request.action === 'deleteCollection') {
-    const collection = collectionsCache.get(request.collectionId);
-    if (collection && collection.id !== 'default') {
-      collectionsCache.delete(request.collectionId);
-      saveCollectionsToStorage().then(() => {
-        sendResponse({ success: true });
-      });
-    } else {
-      sendResponse({ success: false, error: 'Cannot delete default collection' });
-    }
+
+  if (request.action === 'groupTabsByFolder') {
+    // Delegate to the React side which has access to Dexie
+    chrome.runtime.sendMessage({ action: 'doGroupTabs' }).catch(() => { });
+    sendResponse({ ok: true });
     return true;
   }
-  
-  if (request.action === 'updateTabStatus') {
-    const collection = collectionsCache.get(request.collectionId);
-    if (collection) {
-      const tab = collection.tabs.find(t => t.id === request.tabId);
-      if (tab) {
-        tab.status = request.status;
-        collectionsCache.set(request.collectionId, collection);
-        saveCollectionsToStorage().then(() => {
-          sendResponse({ success: true });
-        });
-      } else {
-        sendResponse({ success: false });
-      }
-    } else {
-      sendResponse({ success: false });
-    }
+
+  if (request.action === 'switchWorkspace') {
+    // The UI handles the actual Dexie ops and then calls tabs.create etc.
+    // Background just relays and opens notification
+    chrome.runtime.sendMessage({
+      action: 'doSwitchWorkspace',
+      fromId: request.fromId,
+      toId: request.toId,
+    }).catch(() => { });
+    sendResponse({ ok: true });
     return true;
   }
-  
-  if (request.action === 'deleteTab') {
-    const collection = collectionsCache.get(request.collectionId);
-    if (collection) {
-      collection.tabs = collection.tabs.filter(tab => tab.id !== request.tabId);
-      collectionsCache.set(request.collectionId, collection);
-      saveCollectionsToStorage().then(() => {
-        sendResponse({ success: true });
-      });
-    } else {
-      sendResponse({ success: false });
-    }
+
+  // Ping (keep alive)
+  if (request.action === 'ping') {
+    sendResponse({ pong: true });
     return true;
   }
-  
-  if (request.action === 'searchTabs') {
-    ensureCacheIsFresh().then(() => {
-      const searchQuery = request.query.toLowerCase();
-      const allTabs = [];
-      
-      // Collect all tabs from all collections
-      collectionsCache.forEach(collection => {
-        collection.tabs.forEach(tab => {
-          allTabs.push({
-            ...tab,
-            collectionId: collection.id,
-            collectionName: collection.name
-          });
-        });
-      });
-      
-      const filteredTabs = allTabs.filter(tab => 
-        tab.title.toLowerCase().includes(searchQuery) ||
-        tab.url.toLowerCase().includes(searchQuery) ||
-        tab.domain.toLowerCase().includes(searchQuery) ||
-        tab.tags.some(tag => tag.toLowerCase().includes(searchQuery)) ||
-        tab.note.toLowerCase().includes(searchQuery)
-      );
-      
-      // Sort by relevance (exact matches first)
-      filteredTabs.sort((a, b) => {
-        const aExact = a.title.toLowerCase() === searchQuery;
-        const bExact = b.title.toLowerCase() === searchQuery;
-        if (aExact && !bExact) return -1;
-        if (!aExact && bExact) return 1;
-        return new Date(b.created_at) - new Date(a.created_at);
-      });
-      
-      sendResponse({ tabs: filteredTabs, total: filteredTabs.length });
-    });
-    return true;
-  }
-  
-  if (request.action === 'saveFromContextMenu') {
-    handleAddToClearTabMind(request.info, request.tab, request.note);
-    sendResponse({ success: true });
-    return true;
-  }
-}); 
+});

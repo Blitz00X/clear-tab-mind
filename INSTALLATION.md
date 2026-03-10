@@ -1,85 +1,123 @@
-# Clear Tab Mind - Installation Guide
+# Clear Tab Mind – Installation Guide
 
-## Quick Installation
+## Requirements
 
-### Option 1: Load Unpacked Extension (Recommended for Development)
+- Google Chrome (version 116+) or Brave Browser
+- Node.js 18+ (for building from source)
 
-1. **Download the Extension**
-   - The extension files are in the `clear-tab-mind-extension/` folder
-   - Or use the ZIP file: `clear-tab-mind-extension.zip`
+---
 
-2. **Open Chrome Extensions Page**
-   - Open Chrome browser
-   - Navigate to `chrome://extensions/`
-   - Or go to Chrome menu → More tools → Extensions
+## Option 1: Build from Source (Recommended)
 
-3. **Enable Developer Mode**
-   - Toggle the "Developer mode" switch in the top-right corner
+### 1. Clone and install
 
-4. **Load the Extension**
-   - Click "Load unpacked" button
-   - Select the `clear-tab-mind-extension` folder
-   - The extension should now appear in your extensions list
+```bash
+git clone https://github.com/Blitz00X/clear-tab-mind.git
+cd clear-tab-mind
+npm install
+```
 
-5. **Pin the Extension**
-   - Click the puzzle piece icon in Chrome toolbar
-   - Find "Clear Tab Mind" and click the pin icon
-   - The extension icon will now appear in your toolbar
+### 2. Build the extension
 
-### Option 2: Install from ZIP
+```bash
+npm run build
+```
 
-1. **Extract the ZIP file**
-   ```bash
-   unzip clear-tab-mind-extension.zip
-   ```
+This produces a `dist/` folder with three HTML entries:
+- `dist/index.html` — Full-page dashboard  
+- `dist/sidepanel.html` — Chrome Side Panel  
+- `dist/popup.html` — Traditional popup
 
-2. **Follow steps 2-5 from Option 1**
+### 3. Copy static extension files into `dist/`
 
-## Usage
+The background service worker, content script, icons, and manifest are not bundled by Vite — copy them manually:
 
-1. **Save a Tab**: Click the extension icon while on any webpage
-2. **Add Tags**: Enter comma-separated tags (e.g., "work, research, todo")
-3. **Add Notes**: Write a note about the tab (optional)
-4. **Save**: Click "Save Tab" to store it locally
-5. **Manage**: View saved tabs and mark them as read or delete them
+```bash
+cp background.js content.js manifest.json dist/
+cp -r icons dist/
+```
 
-## Features
+### 4. Load in Chrome
 
-- ✅ Save current tab with tags and notes
-- ✅ View all saved tabs in the popup
-- ✅ Mark tabs as read/unread
-- ✅ Delete saved tabs
-- ✅ Open saved tabs in new windows
-- ✅ Local storage (no data sent to servers)
-- ✅ Clean, modern interface
+1. Open `chrome://extensions/`
+2. Enable **Developer mode** (top-right toggle)
+3. Click **Load unpacked**
+4. Select the `dist/` folder
+5. The extension installs and the icon appears in your toolbar
+
+### 5. Open the Side Panel
+
+Click the **Clear Tab Mind icon** in the toolbar to open the Side Panel. Or click **Open full dashboard** inside the panel to open the full-page view.
+
+---
+
+## Option 2: Development Mode (Hot Reload)
+
+Run the React dev server to iterate on the dashboard UI without rebuilding:
+
+```bash
+npm run dev
+```
+
+Then load the **repository root** (not `dist/`) as an unpacked extension — the background worker and popup use the source files directly while the dashboard runs at `localhost:8080`.
+
+> ⚠️ In dev mode the Side Panel opens `sidepanel.html` from the repo root, bypassing Vite. Changes to React components require a manual rebuild for the extension to pick them up.
+
+---
+
+## Using the Extension
+
+### Quick Save (Side Panel)
+1. Click the extension icon → Side Panel opens
+2. Paste a URL into the **Quick save** field and press Enter
+3. The item is saved with auto-detected type; YouTube/Vimeo thumbnails fetched automatically
+
+### Context Menu
+Right-click any link or page → **Add to Clear Tab Mind** — the item is saved without leaving your current context.
+
+### Command Palette (`Ctrl+Shift+K`)
+Opens a command bar for:
+- Searching all items (title, URL, tags)
+- Switching workspaces
+- Adding RSS feeds
+- Grouping open tabs by folder
+
+### Workspaces
+- Create workspaces via the **WorkspaceSelector** dropdown
+- Switching workspace **saves all current tabs** (hibernated state) and **restores** the target workspace's tabs
+
+### Tab Hibernation
+Tabs inactive for **30+ minutes** are automatically:
+1. Saved to IndexedDB with status `hibernated`
+2. Removed from the browser
+3. Shown in the **Hibernated** section of the Side Panel for one-click restore
+
+### RSS Feeds
+1. Open Dashboard → left sidebar → **📡** tab → **Add Feed**
+2. Paste an RSS/Atom URL, choose a folder and polling interval
+3. New entries appear as **unread** items in the chosen folder
+
+---
 
 ## Troubleshooting
 
-**Extension not loading?**
-- Make sure all files are present in the extension folder
-- Check that `manifest.json` is valid
-- Try refreshing the extensions page
+| Problem | Solution |
+|---|---|
+| Extension icon missing | Pin it via the puzzle piece menu in the toolbar |
+| Side Panel blank | Ensure `sidepanel.html` was copied to `dist/` |
+| Tab groups not working | Requires Chrome 89+ with Tab Groups enabled |
+| Hibernation not triggering | Check that `chrome.alarms` permission was granted; reload extension |
+| RSS feed not updating | Verify the feed URL returns valid XML; check the error count in the feed list |
+| Build errors | Run `npm install` first; ensure Node 18+ |
 
-**Extension not working?**
-- Check the browser console for errors
-- Make sure you're on a valid webpage (not chrome:// pages)
-- Try disabling and re-enabling the extension
+---
 
-**Icons not showing?**
-- The extension includes placeholder icons
-- You can replace them with custom icons in the `icons/` folder
+## Updating the Extension
 
-## Development
+1. Pull the latest changes: `git pull`
+2. Rebuild: `npm run build && cp background.js content.js manifest.json icons dist/`
+3. Go to `chrome://extensions/` → click the **refresh** icon on the Clear Tab Mind card
 
-To modify the extension:
-1. Edit the files in the extension folder
-2. Go to `chrome://extensions/`
-3. Click the refresh icon on the extension card
-4. Test your changes
+## License
 
-## Support
-
-If you encounter any issues:
-1. Check the browser console for error messages
-2. Verify all required permissions are granted
-3. Try reinstalling the extension 
+GNU General Public License v3.0 — see [LICENSE](LICENSE).

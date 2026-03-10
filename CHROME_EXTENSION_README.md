@@ -1,89 +1,88 @@
-# Clear Tab Mind - Chrome Extension
+# Clear Tab Mind – Chrome Extension Guide
 
-A Chrome extension that helps you save and organize your browser tabs to clear your mind and reduce tab clutter.
+A Chrome/Brave extension (Manifest V3) for scalable tab management, RSS integration, video library, and workspace context switching.
 
-## Features
+## Key Features
 
-- **Save Current Tab**: Quickly save the current tab with tags and notes
-- **Tab Organization**: Organize saved tabs with tags and status (unread/read/archived)
-- **Local Storage**: All data is stored locally in your browser
-- **Quick Access**: View and manage your saved tabs from the extension popup
-- **Tab Management**: Mark tabs as read, archive them, or delete them
+| Feature | Description |
+|---|---|
+| 🌙 **Tab Hibernation** | Tabs inactive 30+ min auto-saved to IndexedDB and closed |
+| 🗂️ **Workspaces** | Isolated tab groups; switching saves/restores all tabs |
+| 📁 **Nested Folders** | Unlimited depth, color-coded, with unread counts |
+| 🎬 **Video Gallery** | YouTube/Vimeo auto-thumbnail with media grid view |
+| 📡 **RSS Integration** | Background polling, new items added as unread |
+| 🔍 **Fuzzy Search** | Fuse.js search across title, tags, URL, and notes |
+| ⌨️ **Command Palette** | `Ctrl+Shift+K` for all actions |
+| 🧹 **Duplicate Cleanup** | Deduplication across 1000s of items |
 
-## Installation
+## Chrome Permissions
 
-### Development Installation
-
-1. Clone this repository
-2. Open Chrome and navigate to `chrome://extensions/`
-3. Enable "Developer mode" in the top right
-4. Click "Load unpacked" and select the directory containing the extension files
-5. The extension should now appear in your extensions list
-
-### Files Structure
-
-```
-clear-tab-mind/
-├── manifest.json          # Extension manifest
-├── popup.html            # Popup HTML
-├── popup.js              # Popup JavaScript
-├── popup.css             # Popup styles
-├── background.js         # Background service worker
-├── content.js            # Content script
-├── icons/                # Extension icons
-│   ├── icon16.png
-│   ├── icon32.png
-│   ├── icon48.png
-│   └── icon128.png
-└── CHROME_EXTENSION_README.md
-```
-
-## Usage
-
-1. **Save a Tab**: Click the extension icon while on any webpage, add tags and notes, then click "Save Tab"
-2. **View Saved Tabs**: Click the extension icon to see your saved tabs
-3. **Manage Tabs**: Use the action buttons to open, mark as read, or delete tabs
-4. **Organize**: Use tags to categorize your tabs and keep them organized
-
-## How it Works
-
-- **Background Script**: Handles tab management and local storage operations
-- **Popup**: Provides the user interface for saving and managing tabs
-- **Content Script**: Extracts page information when needed
-- **Local Storage**: Uses Chrome's storage API to persist data locally
+| Permission | Reason |
+|---|---|
+| `activeTab` | Read current tab URL + title |
+| `tabs` | Open/close/query all tabs |
+| `tabGroups` | Brave-style folder grouping via chrome.tabGroups API |
+| `alarms` | Scheduled hibernation (5 min) and RSS polling (60 min) |
+| `sidePanel` | Persistent side panel (`sidepanel.html`) |
+| `contextMenus` | Right-click "Add to Clear Tab Mind" on links and pages |
+| `scripting` | Inject content scripts |
+| `notifications` | Save confirmations |
+| `storage` | Extension settings fallback |
 
 ## Data Storage
 
-All saved tabs are stored locally in your browser using Chrome's storage API. No data is sent to external servers.
+All user data (items, folders, workspaces, RSS feeds) is stored **locally** in **IndexedDB** via [Dexie.js](https://dexie.org). Nothing is sent to external servers. Supabase is used only for optional user authentication.
 
-## Permissions
+### Database Schema
 
-- `activeTab`: To access information about the current tab
-- `storage`: To save and retrieve tab data locally
-- `tabs`: To create new tabs when opening saved links
+```
+items       → id, title, url, favicon, thumbnail_url, tags, folder_id, workspace_id, type, status, metadata
+folders     → id, name, parent_id, workspace_id, color, icon, order
+workspaces  → id, name, description, color, icon, is_active
+rss_feeds   → id, url, name, folder_id, workspace_id, fetch_interval_minutes, last_fetched
+```
 
-## Development
+## Entry Points
 
-To modify the extension:
+After building, the `dist/` folder contains three independent HTML entry points:
 
-1. Edit the relevant files (popup.js, background.js, etc.)
-2. Go to `chrome://extensions/`
-3. Click the refresh icon on the extension card
-4. Test your changes
+| File | Description |
+|---|---|
+| `index.html` | Full-page dashboard (open via `chrome-extension://[id]/index.html`) |
+| `sidepanel.html` | Chrome Side Panel (opens when extension icon is clicked) |
+| `popup.html` | Traditional popup (fallback for older Chrome versions) |
 
-## Building for Production
+## Architecture
 
-To create a distributable version:
+```
+background.js (Service Worker)
+  ├── chrome.alarms → hibernation check every 5 min
+  ├── chrome.alarms → RSS poll trigger every 60 min
+  ├── chrome.tabs.onActivated → track tab activity timestamps
+  ├── chrome.contextMenus → "Add to Clear Tab Mind"
+  └── chrome.runtime.onMessage → bridge for UI commands
 
-1. Create a ZIP file containing all extension files
-2. Upload to the Chrome Web Store or distribute manually
+React UI (Dashboard / SidePanel)
+  ├── useWorkspaceData hook → all data operations
+  ├── Dexie.js → IndexedDB (items, folders, workspaces, feeds)
+  ├── rssParser.ts → fetch + parse RSS/Atom XML
+  ├── linkScraper.ts → oEmbed (YouTube/Vimeo) + Open Graph
+  ├── tabGroupService.ts → chrome.tabGroups auto-grouping
+  └── workspaceService.ts → save/restore workspace tabs
+```
 
-## Troubleshooting
+## Building
 
-- If the extension doesn't work, check the browser console for errors
-- Make sure all required files are present in the extension directory
-- Verify that the manifest.json file is valid
+```bash
+npm install
+npm run build
+# Then copy static files:
+cp background.js content.js manifest.json dist/
+cp -r icons dist/
+```
+
+Load `dist/` as unpacked extension at `chrome://extensions/`.
 
 ## License
 
-This project is open source and available under the MIT License. 
+GNU General Public License v3.0

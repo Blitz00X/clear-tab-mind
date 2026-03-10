@@ -1,30 +1,48 @@
 {
   "manifest_version": 3,
   "name": "Clear Tab Mind",
-  "version": "1.0.0",
-  "description": "Save and organize your browser tabs to clear your mind",
+  "version": "2.0.0",
+  "description": "Scalable tab & content management with workspaces, RSS, hibernation, and media hub",
   "permissions": [
     "activeTab",
     "storage",
     "tabs",
+    "tabGroups",
     "contextMenus",
-    "notifications"
+    "notifications",
+    "sidePanel",
+    "alarms",
+    "scripting"
   ],
   "host_permissions": [
     "https://*/*",
     "http://*/*"
   ],
   "action": {
-    "default_popup": "popup.html",
     "default_title": "Clear Tab Mind"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
   },
   "background": {
     "service_worker": "background.js"
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"]
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content.js"
+      ]
     }
-  ]
-} 
+  ],
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Y"
+      },
+      "description": "Open Clear Tab Mind side panel"
+    }
+  }
+}

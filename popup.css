@@ -6,21 +6,39 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  height: 100%;
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   font-size: 14px;
   line-height: 1.4;
   color: #333;
   background: #f8f9fa;
+  margin: 0;
+  display: flex;
+  overflow: hidden;
+}
+
+#root {
+  flex: 1;
+  display: flex;
+  min-height: 0;
 }
 
 .popup-container {
-  width: 700px;
-  min-height: 800px;
+  width: 100%;
+  height: 100%;
   background: white;
-  border-radius: 8px;
+  border-radius: 0;
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: none;
+  border-left: 1px solid #e9ecef;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .popup-header {
@@ -76,12 +94,19 @@ body {
 
 .popup-content {
   padding: 16px;
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-height: 0;
 }
 
 .save-section {
-  margin-bottom: 24px;
+  margin-bottom: 0;
   padding-bottom: 16px;
   border-bottom: 1px solid #e9ecef;
+  flex: 0 0 auto;
 }
 
 .save-section h3 {
@@ -195,6 +220,13 @@ body {
 }
 
 /* Collections Section */
+.collections-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .collections-section h3 {
   font-size: 16px;
   font-weight: 600;
@@ -220,6 +252,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  flex: 1;
+  overflow-y: auto;
 }
 
 .collection-item {
@@ -283,6 +317,13 @@ body {
 }
 
 /* Tabs Section */
+.saved-tabs-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .saved-tabs-section h3 {
   font-size: 16px;
   font-weight: 600;
@@ -344,7 +385,7 @@ body {
 }
 
 .tabs-list {
-  max-height: 600px;
+  flex: 1;
   overflow-y: auto;
   margin-bottom: 16px;
 }
@@ -481,7 +522,7 @@ body {
 /* Responsive design */
 @media (max-width: 480px) {
   .popup-container {
-    width: 400px;
+    max-width: 100%;
   }
   
   .tabs-header {
@@ -497,4 +538,4 @@ body {
   .filter-select {
     width: 100%;
   }
-} 
+}
